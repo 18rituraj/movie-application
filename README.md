@@ -1,70 +1,83 @@
-# Getting Started with Create React App
+# EDI 210 AI Summarizer — Local Setup
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Architecture
 
-## Available Scripts
+```
+edi-ai-demo/
+├── backend/
+│   ├── app.py              FastAPI server: parses EDI, calls Claude
+│   ├── requirements.txt
+│   └── .env.example
+├── frontend/
+│   ├── index.html          Upload UI
+│   ├── style.css
+│   └── script.js           Calls backend over HTTP (fetch)
+└── sample_210.edi          Test file
+```
 
-In the project directory, you can run:
+**Flow:** Browser (frontend) → HTTP POST `/api/summarize` → FastAPI backend
+parses the EDI text into segments → backend sends the parsed structure to
+Claude via the Anthropic API → backend returns `{segments, summary}` as JSON
+→ frontend renders the table + AI summary.
 
-### `npm start`
+The backend holds your API key (never exposed to the browser). The
+frontend is plain HTML/CSS/JS — no build step, no framework — so it's easy
+to read and modify for a demo.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Setup
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### 1. Backend
 
-### `npm test`
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env            # then edit .env with your real key
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Load the `.env` file (FastAPI/uvicorn don't do this automatically) — either:
+- `pip install python-dotenv` (already in requirements.txt) and add
+  `from dotenv import load_dotenv; load_dotenv()` at the top of `app.py`, or
+- just export it directly in your shell instead of using `.env`:
+  ```bash
+  export ANTHROPIC_API_KEY=your_key_here
+  ```
 
-### `npm run build`
+Run the server:
+```bash
+uvicorn app:app --reload --port 8000
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Confirm it's up: open `http://localhost:8000/api/health` — should return `{"status":"ok"}`.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### 2. Frontend
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+No build tools needed. From the `frontend/` folder, just open `index.html`
+directly in a browser, **or** serve it (recommended, avoids CORS quirks):
 
-### `npm run eject`
+```bash
+cd frontend
+python -m http.server 5500
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Then visit `http://localhost:5500`.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### 3. Use it
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Upload `sample_210.edi` (or paste EDI text) and click **Parse & Summarize**.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## VS Code tips
 
-## Learn More
+- Install the "Python" extension for backend debugging (set breakpoints in `app.py`).
+- Install "Live Server" extension as an alternative to `http.server` for the frontend.
+- The two processes (backend on :8000, frontend on :5500) run in separate terminals — use VS Code's split terminal.
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Extending it
 
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- Swap `parse_edi_210` in `app.py` for a real library (`pyx12`, `bots`) to
+  handle more transaction types than just the 210.
+- Add an `/api/validate` endpoint that checks against a trading partner's
+  implementation guide.
+- Point the parser at your own IBM i job's output files instead of a flat
+  `.edi` file.
